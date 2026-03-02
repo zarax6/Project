@@ -31,7 +31,6 @@ class MainWindow(QMainWindow):
         print(self.button_is_checked)
 
 
-
 app = QApplication(sys.argv)
 
 window = MainWindow()
