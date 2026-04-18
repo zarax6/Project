@@ -6,7 +6,7 @@ from pathlib import Path
 
 try:
     from PyQt6.QtCore import QFileInfo, QPoint, QTimer, Qt, QSize
-    from PyQt6.QtGui import QAction, QCursor
+    from PyQt6.QtGui import QAction
     from PyQt6.QtWidgets import (
         QApplication,
         QFileDialog,
@@ -17,6 +17,7 @@ try:
         QMenu,
         QMessageBox,
         QPushButton,
+        QLabel,
         QStyle,
         QToolButton,
         QVBoxLayout,
@@ -24,7 +25,7 @@ try:
     )
 except ImportError:
     from PySide6.QtCore import QFileInfo, QPoint, QTimer, Qt, QSize
-    from PySide6.QtGui import QAction, QCursor
+    from PySide6.QtGui import QAction
     from PySide6.QtWidgets import (
         QApplication,
         QFileDialog,
@@ -35,6 +36,7 @@ except ImportError:
         QMenu,
         QMessageBox,
         QPushButton,
+        QLabel,
         QStyle,
         QToolButton,
         QVBoxLayout,
@@ -74,23 +76,7 @@ class AppLaunchButton(QToolButton):
         )
         self.update_icon(None)
 
-    def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.parent_window.launch_selected_app()
-            event.accept()
-            return
-        super().mouseDoubleClickEvent(event)
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and not self.parent_window.selected_app_path:
-            self.parent_window.choose_application()
-            event.accept()
-            return
-        if event.button() == Qt.MouseButton.RightButton:
-            self.parent_window.show_cube_menu(event.globalPosition().toPoint())
-            event.accept()
-            return
-        super().mousePressEvent(event)
+        self.clicked.connect(self.parent_window.launch_selected_app)
 
     def update_icon(self, app_path):
         if app_path and Path(app_path).exists():
@@ -100,8 +86,7 @@ class AppLaunchButton(QToolButton):
                 self.setIcon(icon)
                 self.setText("")
                 self.setToolTip(
-                    "Двойной клик запускает приложение.\n"
-                    "Правый клик позволяет сменить или очистить путь."
+                    "Один клик запускает приложение."
                 )
                 return
 
@@ -110,7 +95,7 @@ class AppLaunchButton(QToolButton):
         self.setText("")
         self.setToolTip(
             "Приложение не выбрано.\n"
-            "Правый клик, чтобы указать .exe."
+            "Нажмите кнопку настройки, чтобы указать .exe."
         )
 
 
@@ -119,6 +104,7 @@ class Widget_1(QMainWindow):
         super().__init__()
 
         self.desktop_mode_applied = False
+        self.closing = False
         self.drag_pos = QPoint()
         self.selected_app_path = ""
 
@@ -153,6 +139,28 @@ class Widget_1(QMainWindow):
         self.title_bar_layout.setContentsMargins(0, 0, 2, 0)
         self.title_bar_layout.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
 
+        self.settings_button = QPushButton("...")
+        self.settings_button.setFixedSize(20, 16)
+        self.settings_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.settings_button.clicked.connect(self.show_settings_menu)
+        self.settings_button.setStyleSheet(
+            """
+            QPushButton {
+                color: #aaaaaa;
+                background-color: transparent;
+                border: none;
+                border-radius: 8px;
+                font-size: 11px;
+                padding: 0px;
+                margin: 0px;
+            }
+            QPushButton:hover {
+                background-color: #3a3a3a;
+                color: white;
+            }
+            """
+        )
+
         self.close_button = QPushButton("x")
         self.close_button.setFixedSize(16, 16)
         self.close_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -177,6 +185,7 @@ class Widget_1(QMainWindow):
             """
         )
 
+        self.title_bar_layout.addWidget(self.settings_button)
         self.title_bar_layout.addWidget(self.close_button)
         self.main_layout.addWidget(self.title_bar)
 
@@ -184,13 +193,29 @@ class Widget_1(QMainWindow):
         self.main_layout.addWidget(self.content_area)
 
         self.grid_layout = QGridLayout(self.content_area)
-        self.grid_layout.setContentsMargins(0, 0, 0, 0)
+        self.grid_layout.setContentsMargins(0, 0, 0, 6)
 
         self.app_button = AppLaunchButton(self)
         self.grid_layout.addWidget(self.app_button, 0, 0, Qt.AlignmentFlag.AlignCenter)
 
+        self.hint_label = QLabel("Настройка: кнопка ...")
+        self.hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hint_label.setStyleSheet(
+            """
+            QLabel {
+                color: #7d7d7d;
+                font-size: 7px;
+                background: transparent;
+            }
+            """
+        )
+        self.grid_layout.addWidget(self.hint_label, 1, 0, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+
         self.load_config()
         self.refresh_button_icon()
+        self.keep_alive_timer = QTimer(self)
+        self.keep_alive_timer.timeout.connect(self.maintain_widget_state)
+        self.keep_alive_timer.start(1200)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -203,7 +228,7 @@ class Widget_1(QMainWindow):
             return
         apply_desktop_window_mode(int(self.winId()))
 
-    def show_cube_menu(self, global_pos):
+    def show_settings_menu(self):
         menu = QMenu(self)
         choose_action = QAction("Выбрать приложение", self)
         choose_action.triggered.connect(self.choose_application)
@@ -214,7 +239,7 @@ class Widget_1(QMainWindow):
         clear_action.setEnabled(bool(self.selected_app_path))
         menu.addAction(clear_action)
 
-        menu.exec(global_pos if isinstance(global_pos, QPoint) else QCursor.pos())
+        menu.exec(self.settings_button.mapToGlobal(self.settings_button.rect().bottomLeft()))
 
     def choose_application(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -237,7 +262,11 @@ class Widget_1(QMainWindow):
 
     def launch_selected_app(self):
         if not self.selected_app_path or not Path(self.selected_app_path).exists():
-            self.choose_application()
+            QMessageBox.information(
+                self,
+                "Приложение не выбрано",
+                "Сначала нажмите кнопку ... и выберите .exe файл.",
+            )
             return
 
         try:
@@ -251,6 +280,7 @@ class Widget_1(QMainWindow):
 
     def refresh_button_icon(self):
         self.app_button.update_icon(self.selected_app_path)
+        self.hint_label.setVisible(not bool(self.selected_app_path))
 
     def load_config(self):
         if not CONFIG_PATH.exists():
@@ -269,6 +299,18 @@ class Widget_1(QMainWindow):
             json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    def maintain_widget_state(self):
+        if self.closing:
+            return
+        if not self.isVisible():
+            self.show()
+        self.apply_desktop_mode()
+
+    def closeEvent(self, event):
+        self.closing = True
+        self.keep_alive_timer.stop()
+        super().closeEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
