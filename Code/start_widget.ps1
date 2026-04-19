@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 
 $codeDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectDir = Split-Path -Parent $codeDir
-$appScript = Join-Path $codeDir "FireFox.py"
+$appScript = Join-Path $codeDir "main.py"
 
 function Pause-And-Exit([int]$code) {
     Write-Host ""
@@ -144,7 +144,7 @@ try {
     Write-Host ""
 
     if (-not (Test-Path $appScript)) {
-        throw "FireFox.py was not found."
+        throw "main.py was not found."
     }
 
     $pythonExe = Get-PythonCommand
