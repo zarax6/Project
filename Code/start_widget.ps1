@@ -1,8 +1,9 @@
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
-$projectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$appScript = Join-Path $projectDir "FireFox.py"
+$codeDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectDir = Split-Path -Parent $codeDir
+$appScript = Join-Path $codeDir "FireFox.py"
 
 function Pause-And-Exit([int]$code) {
     Write-Host ""
@@ -138,6 +139,7 @@ try {
     Write-Host "Desktop Widget Launcher"
     Write-Host "====================================="
     Write-Host "Project folder: $projectDir"
+    Write-Host "Code folder: $codeDir"
     Write-Host "Script: $appScript"
     Write-Host ""
 
@@ -155,7 +157,7 @@ try {
     Write-Host "Starting widget..."
     $run = Start-Process -FilePath $pythonExe `
         -ArgumentList "`"$appScript`"" `
-        -WorkingDirectory $projectDir `
+        -WorkingDirectory $codeDir `
         -NoNewWindow -Wait -PassThru
 
     if ($run.ExitCode -ne 0) {
